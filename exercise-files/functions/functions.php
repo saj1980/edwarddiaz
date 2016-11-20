@@ -51,37 +51,47 @@ DELIMITER;
 return $error_message; 
 }
 
-// function email_exists($email) {
+function email_exists($email) {
 
-// 	$sql = "SELECT id FROM users WHERE email = '$email'";
+	$sql = "SELECT id FROM users WHERE email = '$email'";
 
-// 	$result = query($sql);
+	$result = query($sql);
 
-// 	if(row_count($result) == 1 ) {
-// 		return true;
-// 	} else {
+	if(row_count($result) == 1 ) {
+		return true;
+	} else {
 
-// 		return false;
-// 	}
+		return false;
+	}
 
-// }
+}
 
 
-// function username_exists($username) {
+function username_exists($username) {
 
-// 	$sql = "SELECT id FROM users WHERE username = '$username'";
+	$sql = "SELECT id FROM users WHERE username = '$username'";
 
-// 	$result = query($sql);
+	$result = query($sql);
 
-// 	if(row_count($result) == 1 ) {
+	if(row_count($result) == 1 ) {
 
-// 		return true;
+		return true;
 
-// 	} else {
+	} else {
 
-// 		return false;
-// 	}
-// }
+		return false;
+	}
+}
+
+
+
+function send_email($email, $subject, $msg, $headers){
+
+	return mail($email, $subject, $msg, $headers);
+
+}
+
+
 
 /*****************Validation functions******************/ 
 
@@ -127,22 +137,22 @@ function validate_user_registration(){
 				$errors[] = "Your username cannot be less than {$min} characters ";
 			}
 
-			// if ($username_exists($username)) {
+			if (username_exists($username)) {
 				
-			// 	$errors[] = "Sorry that username already is registreret";
+				$errors[] = "Sorry that username already is registreret";
 
-			// }
+			}
 
 			if(strlen($username) > $max){
 				
 				$errors[] = "Your username cannot be more than {$max} characters ";
 			}
 
-			// if ($email_exists($email)) {
+			if (email_exists($email)) {
 				
-			// 	$errors[] = "Sorry that email already is registreret";
+				$errors[] = "Sorry that email already is registreret";
 
-			// }
+			}
 
 			if(strlen($email) < $min){
 				
@@ -159,7 +169,275 @@ function validate_user_registration(){
 				echo validation_errors($error);
 
 				}
+			} else {
+
+				if (register_user($first_name, $last_name, $username, $email, $password)) {
+
+					set_message("<p class='bg-success text-center'> Please check your email or spam folder for an activation code link</p>");
+					redirect("index.php"); 
+					
+				} else {
+
+					set_message("<p class='bg-danger text-center'>Sorry we could not register the user. </p>");
+					redirect("index.php"); 
+				}
+			}
+		} // Post request
+} // function
+
+/***************** REGISTER USER FUNCTION  ******************/ 
+
+function register_user($first_name, $last_name, $username, $email, $password) {
+
+	$first_name = escape($first_name);
+	$last_name 	= escape($last_name);
+	$username 	= escape($username);
+	$email 		= escape($email);
+	$password 	= escape($password);
+
+
+	if(email_exists($email)) {
+
+		return false; 
+	
+	} else if (username_exists($username)) {
+		return false;
+
+	} else {
+
+		$password = md5($password);
+
+		$validation_code = md5($username + microtime());
+
+		$sql = "INSERT INTO users(first_name, last_name, username, email, password, validation_code, active)";
+		$sql .= " VALUES('$first_name','$last_name','$username','$email','$password','$validation_code', 0)";
+		$result = query($sql);
+		confirm($result);
+		
+		$subject = "Activation account";
+		$msg = "Please click the link below to activate your account 
+
+		http://localhost:8888/Edwad_diaz/exercise-files/activate.php?email=$email&code=$validation_code"; 
+
+		$headers = "From: noreply@mywebsite.com"; 
+
+
+		send_email($email, $subject, $msg, $headers);
+
+		return true;
+	}
+
+
+} 
+
+/***************** ACTIVATE USER FUNCTION  ******************/ 
+
+function activate_user() {
+
+	if($_SERVER['REQUEST_METHOD'] == "GET") {
+
+		if(isset($_GET['email'])) {
+
+			$email = clean($_GET['email']);
+			$validation_code = clean($_GET['code']);
+
+			$sql = "SELECT id FROM users WHERE email = '".escape($_GET['email'])."' AND validation_code = '" . escape($_GET['code'])."' ";
+			$result = query($sql);
+			confirm($result);
+
+			if (row_count($result) == 1) {
+
+				$sql2 = "UPDATE users SET active = 1, validation_code = 0 WHERE email = '".escape($email)."' AND validation_code = '".escape($validation_code)."'";
+				$result2 = query($sql2);
+				confirm($result2);
+
+				set_message ("<p class='bg-success'>Your account has been activated. Please login</p>");
+				redirect("login.php");
+			} else {
+
+				set_message ("<p class='bg-danger'>Sorry, your account could not be activated</p>");
+				redirect("login.php");
+			}
+			
+
+		} 
+	}
+} // function
+
+
+/***************** VALIDATE USER LOGIN FUNCTION  ******************/ 
+
+
+
+function validate_user_login(){
+
+	$errors = []; 
+
+	$min = 3; 
+	$max = 20; 
+
+
+	if ($_SERVER['REQUEST_METHOD'] == "POST") { 
+
+		$email		= clean($_POST['email']);
+		$password 	= clean($_POST['password']);
+		$remember 	= isset($_POST['remember']);
+
+			if (empty($email)) {
+				$errors[] = "Email field cannot be empty";
+			}
+			if (empty($password)) {
+				$errors[] = "Password field cannot be empty";
+			}			
+
+			if (!empty($errors)) {
+				foreach ($errors as $error) {
+					
+				echo validation_errors($error);
+
+				}
+			} else {
+				
+				if (login_user($email, $password, $remember)) {
+					redirect("admin.php");
+				} else {
+					echo validation_errors("your credentials are not correct");
+				}
+			}
+	}
+} // function
+
+
+/*****************  USER LOGIN FUNCTION  ******************/ 
+
+
+function login_user($email, $password, $remember) {
+
+	$sql = "SELECT password, id FROM users WHERE email = '".escape($email)."' AND active = 1";
+	$result = query($sql); 
+
+	if (row_count($result) == 1) {
+	 	
+	 	$row = mysqli_fetch_array($result);
+
+	 	$db_password = $row['password'];
+
+	 	if (md5($password) === $db_password) {
+
+	 		if ($remember == "on") {
+	 			setcookie('email', $email, time() + 86400);
+	 		}
+
+	 		$_SESSION['email'] = $email; 
+
+	 		return true;
+	 	}else {
+	 		return false;
 			}
 
-			}
-}
+	 	return true;
+
+	 } else {
+
+	 	return false;
+	 }
+
+} // end of function  
+
+
+/*****************  LOGGED IN FUNCTION  ******************/ 
+
+function logged_in(){
+
+	if (isset($_SESSION['email']) || isset($_COOKIE['email'])) {
+		return true; 
+	} else {
+		return false; 
+	}
+} // functions end
+
+
+/*****************  RECOVER PASSWORD FUNCTION  ******************/ 
+
+function recover_password() {
+
+	if ($_SERVER['REQUEST_METHOD'] == "POST") {
+
+		if (isset($_SESSION['token']) && ($_POST['token']) === $_SESSION['token']) {
+
+			$email = clean($_POST['email']);
+
+			if(email_exists($email)){
+
+				$validation_code = md5($email + microtime());
+
+				setcookie('temp_access_code', $validation_code, time()+60);
+
+				$sql = "UPDATE users SET validation_code = '".escape($validation_code)."' WHERE email = '".escape($email)."'"; 
+				$result = query($sql); 
+				confirm($result);
+
+				$subject = "Please reset your password";
+				$message = "Here is your password reset code {$validation_code}
+
+				CLICK here to reset your password http://localhost:8888/Edwad_diaz/exercise-files/code.php?email={$email}&code={$validation_code}
+
+				"; 
+
+				$headers = "From: noreply@mywebsite.com"; 
+
+				if (send_email($email, $subject, $message, $headers)) {
+					
+				} else {
+
+					echo validation_errors("Email could not be sent");
+
+				}
+
+
+				} else {
+
+					echo validation_errors("This email does not exist");
+				}
+		
+
+		} else {
+
+			redirect('index.php');
+		}
+		// Tokens checks
+
+			
+	} // post request 
+
+
+} // functions
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
