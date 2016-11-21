@@ -1,4 +1,8 @@
 <?php include('includes/header.php'); ?>
+
+<?php if (logged_in()) {
+    redirect("admin.php");
+} ?>
  
 <?php include('includes/nav.php'); ?>
     

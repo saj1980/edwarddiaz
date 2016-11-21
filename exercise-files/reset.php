@@ -4,7 +4,15 @@
 <div class="container">
 
 	<div class="row">
+		<div class="col-lg-6 col-lg-offset-3">	
+		
 
+			<?php display_message(); ?>
+
+			<?php validate_code (); ?>
+
+			<?php password_reset(); ?>			
+		</div>
 	</div>
     	<div class="row">
 			<div class="col-md-6 col-md-offset-3">
@@ -36,6 +44,7 @@
 											</div>
 										</div>
 									</div>
+									<input type="hidden" class="hide" name="token" id="token" value="<?php echo token_generator(); ?>">
 								</form>
 							</div>
 						</div>

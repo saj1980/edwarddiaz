@@ -4,7 +4,16 @@
 
 function clean($string){
 
-	return htmlentities($string);
+	// return htmlentities($string);
+	if($string == ($_POST['email'])){
+
+		return filter_var($string, FILTER_SANITIZE_EMAIL);
+
+	} else{
+
+		return filter_var($string, FILTER_SANITIZE_STRING);
+		
+	}
 
 }
 
@@ -17,8 +26,10 @@ function redirect($location){
 function set_message($message){
 
 	if (!empty($message)) {
+
 		$_SESSION['message'] = $message;
-	}else {
+
+	} else {
 
 		$message = "";
 
@@ -104,7 +115,7 @@ function validate_user_registration(){
 
 
 	if ($_SERVER['REQUEST_METHOD'] == "POST") {
-		
+
 			$first_name 		= clean($_POST['first_name']);
 			$last_name	 		= clean($_POST['last_name']);
 			$username	 		= clean($_POST['username']);
@@ -212,7 +223,7 @@ function register_user($first_name, $last_name, $username, $email, $password) {
 		$sql = "INSERT INTO users(first_name, last_name, username, email, password, validation_code, active)";
 		$sql .= " VALUES('$first_name','$last_name','$username','$email','$password','$validation_code', 0)";
 		$result = query($sql);
-		confirm($result);
+
 		
 		$subject = "Activation account";
 		$msg = "Please click the link below to activate your account 
@@ -243,16 +254,16 @@ function activate_user() {
 
 			$sql = "SELECT id FROM users WHERE email = '".escape($_GET['email'])."' AND validation_code = '" . escape($_GET['code'])."' ";
 			$result = query($sql);
-			confirm($result);
+
 
 			if (row_count($result) == 1) {
 
 				$sql2 = "UPDATE users SET active = 1, validation_code = 0 WHERE email = '".escape($email)."' AND validation_code = '".escape($validation_code)."'";
 				$result2 = query($sql2);
-				confirm($result2);
 
 				set_message ("<p class='bg-success'>Your account has been activated. Please login</p>");
 				redirect("login.php");
+
 			} else {
 
 				set_message ("<p class='bg-danger'>Sorry, your account could not be activated</p>");
@@ -311,24 +322,24 @@ function validate_user_login(){
 /*****************  USER LOGIN FUNCTION  ******************/ 
 
 
-function login_user($email, $password, $remember) {
+function login_user($email, $password, $remember) { // Tjek email, password og cookie/session
 
 	$sql = "SELECT password, id FROM users WHERE email = '".escape($email)."' AND active = 1";
-	$result = query($sql); 
+	$result = query($sql); // undersøger om der er en match i databasen
 
-	if (row_count($result) == 1) {
+	if (row_count($result) == 1) { // IF 1 THEN
 	 	
-	 	$row = mysqli_fetch_array($result);
+	 	$row = mysqli_fetch_array($result); //Fetch data fra det ene der er fundet. 
 
-	 	$db_password = $row['password'];
+	 	$db_password = $row['password']; // Lav password om til en variabel $db_password
 
-	 	if (md5($password) === $db_password) {
+	 	if (md5($password) === $db_password) { // sammenlign med md5 password og om det er det samme
 
-	 		if ($remember == "on") {
-	 			setcookie('email', $email, time() + 86400);
+	 		if ($remember == "on") { // hvis REMEMBER er on, så set cookie
+	 			setcookie('email', $email, time() + 86400); //86400 sekunder skal cookien holde
 	 		}
 
-	 		$_SESSION['email'] = $email; 
+	 		$_SESSION['email'] = $email; // SPØRGSMÅL
 
 	 		return true;
 	 	}else {
@@ -361,21 +372,22 @@ function logged_in(){
 
 function recover_password() {
 
-	if ($_SERVER['REQUEST_METHOD'] == "POST") {
+	if ($_SERVER['REQUEST_METHOD'] == "POST") { // IF something posted THEN
 
-		if (isset($_SESSION['token']) && ($_POST['token']) === $_SESSION['token']) {
+		if (isset($_SESSION['token']) && ($_POST['token']) === $_SESSION['token']) { // IF isset in token and === with SESSION token (SPØRGSMÅL)
 
-			$email = clean($_POST['email']);
+			$email = clean($_POST['email']); // Rens email via clean funktion
 
-			if(email_exists($email)){
+			if(email_exists($email)){ // IF email eksistere THEN
 
-				$validation_code = md5($email + microtime());
 
-				setcookie('temp_access_code', $validation_code, time()+60);
+				$validation_code = md5($email + microtime()); // Lav en validation code
+
+				setcookie('temp_access_code', $validation_code, time()+900); // Set en cookie på temp_access_code
 
 				$sql = "UPDATE users SET validation_code = '".escape($validation_code)."' WHERE email = '".escape($email)."'"; 
-				$result = query($sql); 
-				confirm($result);
+				$result = query($sql);  // Updatere sql databasen via query. 
+
 
 				$subject = "Please reset your password";
 				$message = "Here is your password reset code {$validation_code}
@@ -384,16 +396,20 @@ function recover_password() {
 
 				"; 
 
-				$headers = "From: noreply@mywebsite.com"; 
+			$headers = "From: noreply@@edwincodecollege.com";
 
-				if (send_email($email, $subject, $message, $headers)) {
-					
-				} else {
 
-					echo validation_errors("Email could not be sent");
 
-				}
 
+
+			send_email($email, $subject, $message, $headers);
+
+
+
+
+			set_message("<p class='bg-success text-center'>Please check your email or spam folder for a password reset code http://localhost:8888/Edwad_diaz/exercise-files/code.php?email={$email}&code={$validation_code}</p>");
+
+			redirect("index.php"); 
 
 				} else {
 
@@ -408,6 +424,11 @@ function recover_password() {
 		// Tokens checks
 
 			
+		if (isset($_POST['cancel_submit'])) {
+
+			redirect("login.php");
+			
+		}
 	} // post request 
 
 
@@ -415,15 +436,99 @@ function recover_password() {
 
 
 
+/*****************  CODE VALIDATION ******************/ 
+
+function validate_code() {
+
+	if (isset($_COOKIE['temp_access_code'])) { // SPØRGSMÅL
+				
+					
+			if (!isset($_GET['email']) && !isset($_GET['code'])) {
+
+				redirect('index.php');
+			
+			} 
+			elseif (empty($_GET['email']) || empty($_GET['code'])) {
+				
+				redirect('index.php');
+			} else {
+
+				if (isset($_POST['code'])) {	// tjekker url for value af CODE
+
+					$email = clean($_GET['email']); // Renser email via clean funktion
+					
+					$validation_code = clean($_POST['code']); // renser code via clean funtion 
+
+					$sql = "SELECT id FROM users WHERE validation_code = '".escape($validation_code)."' AND email = '".escape($email)."'";
+					$result = query($sql);
+
+					if (row_count($result) == 1) {
+						
+						setcookie('temp_access_code', $validation_code, time()+300); // SPØRGSMÅL
+
+						redirect("reset.php?email=$email&code=$validation_code"); // SLETTES når mail virker
+
+					} else {
+
+						echo validation_errors("Sorry wrong validation code");
+					}
+
+				}
+			}
+		
+
+	} else {
+
+		set_message("<p class='bg-danger text-center'>Sorry, your validation code was expired</p>");	
+		redirect("recover.php");
+
+	}
 
 
+} // End function
 
 
+/*****************  PASSWORD RESET FUNCTION ******************/ 
 
 
+function password_reset() {
 
+	if (isset($_COOKIE['temp_access_code'])) { // SPØRGSMÅL
 
+		if (isset($_GET['email']) && (isset($_GET['code']))) {
+			if (isset($_SESSION['token']) && isset($_POST['token'])) {
 
+				 if ($_POST['token'] === $_SESSION['token']) { // SPØRGSMÅL
+
+				 	if ($_POST['password'] === $_POST['confirm_password']) { // true if it is same password
+
+				 		$update_password = md5($_POST['password']); // Kryptere password til datasen
+
+				 		$sql = "UPDATE users SET password = '".escape($update_password)."', validation_code = 0 WHERE email = '".escape($_GET['email'])."'";
+				 		
+				 		query($sql); //sendes til database
+						
+						set_message("<p class='bg-success text-center'>Your password is successfully updated. Please login. </p>");	
+						
+						redirect("login.php");
+
+					} else {
+						
+						set_message("<p class='bg-danger text-center'>Password er IKKE ens </p>");	// ikke ens password
+						
+					}					
+				}	
+	
+			} 
+
+	} else {
+
+		set_message("<p class='bg-danger text-center'>Sorry, your time has expired.  </p>");
+		redirect("recover.php");
+		}
+
+}
+}
 
 
 
