@@ -20,18 +20,6 @@ function escape($string) {
 
 }
 
-function confirm($result) {
-
-	global $con;
-
-	if(!$result) {
-
-		die("QUERY FAILED" . mysqli_error($con));
-
-	}
-
-}
-
 
 
 function query($query) {
@@ -44,6 +32,18 @@ function query($query) {
 
 	return $result;
 
+
+}
+
+function confirm($result) {
+
+	global $con;
+
+	if(!$result) {
+
+		die("QUERY FAILED" . mysqli_error($con));
+
+	}
 
 }
 
