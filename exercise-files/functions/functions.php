@@ -254,6 +254,7 @@ function activate_user() {
 
 			$sql = "SELECT id FROM users WHERE email = '".escape($_GET['email'])."' AND validation_code = '" . escape($_GET['code'])."' ";
 			$result = query($sql);
+			confirm($result);
 
 
 			if (row_count($result) == 1) {

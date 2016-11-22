@@ -49,8 +49,6 @@ function confirm($result) {
 
 
 
-
-
 function fetch_array($result) {
 
 	global $con;
